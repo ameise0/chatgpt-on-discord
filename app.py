@@ -17,10 +17,7 @@ client = discord.Client(intents=intents)
 async def on_ready():
     print(f'We have logged in as {client.user}')
 
-chat_messages = []
-default_system_settings = """"""
-if default_system_settings:
-    chat_messages.append({"role": "system", "content": default_system_settings})
+chat_messages = {}
 
 enable_channels = set()
 
@@ -41,33 +38,35 @@ async def on_message(message):
     if not message.channel.id in enable_channels:
         if message.content.startswith("$start"):
             enable_channels.add(message.channel.id)
+            chat_messages[message.channel.id] = []
             await message.channel.send("started.")
         return
 
     if message.content.startswith("$stop"):
         enable_channels.discard(message.channel.id)
+        chat_messages.pop(message.channel.id, None)
         return await message.channel.send("stopped.")
     
     if message.content.startswith("$reset"):
-        chat_messages.clear()
+        chat_messages[message.channel.id].clear()
         return await message.channel.send("reset log.")
     
     if message.content.startswith("$set_settings "):
-        chat_messages.clear()
+        chat_messages[message.channel.id].clear()
         system_settings = message.content.replace("$set_settings ", "")
-        chat_messages.append({"role": "system", "content": system_settings})
+        chat_messages[message.channel.id].append({"role": "system", "content": system_settings})
         return await message.channel.send("set settings.")
     
-    chat_messages.append({"role": "user", "content": message.content})
+    chat_messages[message.channel.id].append({"role": "user", "content": message.content})
     
     res = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        messages=chat_messages,
+        messages=chat_messages[message.channel.id],
         max_tokens=1024,
         temperature=0.6
     )
     
-    chat_messages.append({"role": "assistant", "content": res.choices[0].message.content})
+    chat_messages[message.channel.id].append({"role": "assistant", "content": res.choices[0].message.content})
     
     await message.channel.send(res.choices[0].message.content)
 
